@@ -35,7 +35,7 @@ func main() {
 	flag.StringVar(&key, "key", "", "key of audit-trail account")
 	flag.StringVar(&appName, "name", "", "your app name")
 	flag.StringVar(&port, "port", "8321", "setup UDP port")
-	flag.UintVar(&clientSpawn, "client-spawn", 100, "setup audit-trail client spawn")
+	flag.UintVar(&clientSpawn, "client_spawn", 100, "setup audit-trail client spawn")
 	flag.UintVar(&timeout, "timeout", 10, "setup your timeout")
 	flag.IntVar(&maxInFlight, "max_in_flight", 1000, "limit request that should be sent to server")
 	flag.IntVar(&timeInFlight, "time_in_flight", 60, "limit time request that should be sent to server (in second)")
