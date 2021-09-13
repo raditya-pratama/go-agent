@@ -1,124 +1,88 @@
 package main
 
 import (
+	"bufio"
+	"encoding/json"
 	"fmt"
-	"math/rand"
-	"sync"
-	"time"
+	"net"
+	"os"
+	"strconv"
+	"strings"
+
+	"github.com/kodekoding/go-agent/entity"
 )
 
-var goRoutine sync.WaitGroup
-
-type Element struct {
-	data string
-	next *Element
-}
-
-type LinkedList struct {
-	first *Element
-	last  *Element
-}
-
-func (l *LinkedList) IsEmpty() bool {
-	return l.first == nil && l.last == nil
-}
-
-func (l *LinkedList) Add(data string) {
-	newEl := &Element{data: data}
-	if l.IsEmpty() {
-		l.first = newEl
-	} else {
-		l.last.next = newEl
-	}
-	l.last = newEl
-}
-
-func (l *LinkedList) Process() *Element {
-	if l.IsEmpty() {
-		return nil
-	}
-	processedEl := l.first
-	l.first = l.first.next
-	processedEl.next = nil
-
-	if l.first == nil { // became empty
-		l.last = nil
-	}
-
-	return processedEl
-}
-
-func (l *LinkedList) Print() {
-	el := l.first
-	for el != nil {
-		fmt.Printf("%s; ", el.data)
-		el = el.next
-	}
-	fmt.Println("")
-}
+var counter = 0
 
 func main() {
-	rand.Seed(time.Now().Unix())
+	arguments := os.Args
+	if len(arguments) == 1 {
+		fmt.Println("Please provide a host:port string")
+		return
+	}
+	CONNECT := arguments[1]
 
-	// Create a buffered channel to manage the employee vs project load.
-	projects := make(chan string, 10)
-
-	// Launch 5 goroutines to handle the projects.
-	goRoutine.Add(5)
-	for i := 1; i <= 5; i++ {
-		go employee(projects, i)
+	s, err := net.ResolveUDPAddr("udp4", CONNECT)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	c, err := net.DialUDP("udp4", nil, s)
+	if err != nil {
+		fmt.Println(err)
+		return
 	}
 
-	for j := 1; j <= 10; j++ {
-		projects <- fmt.Sprintf("Project :%d", j)
-	}
-
-	// Close the channel so the goroutines will quit
-	close(projects)
-	fmt.Println("projects closed")
-	goRoutine.Wait()
-
-	fmt.Println("linkedlist sample start")
-	list := &LinkedList{}
-	list.Add("data1")
-	list.Print()
-	list.Add("data2")
-	list.Print()
-	list.Add("data3")
-	list.Print()
-	list.Add("data4")
-	list.Print()
+	fmt.Printf("The UDP server is %s\n", c.RemoteAddr().String())
+	defer c.Close()
 
 	for {
-		if list := list.Process(); list == nil {
-			break
+		reader := bufio.NewReader(os.Stdin)
+		fmt.Print(">> ")
+		text, _ := reader.ReadString('\n')
+		data := []byte(text)
+		times, err := strconv.Atoi(text[0 : len(text)-1])
+		if err != nil {
+			fmt.Println("error: ", err.Error())
 		}
-		list.Print()
-	}
-}
-
-func employee(projects chan string, employee int) {
-	defer goRoutine.Done()
-	for {
-		// Wait for project to be assigned.
-		project, result := <-projects
-
-		if result == false {
-			// This means the channel is empty and closed.
-			fmt.Printf("Employee : %d : Exit\n", employee)
+		sendMultipleData(c, times)
+		if strings.TrimSpace(string(data)) == "STOP" {
+			fmt.Println("Exiting UDP client!")
 			return
 		}
 
-		fmt.Printf("Employee : %d : Started   %s\n", employee, project)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
 
-		// Randomly wait to simulate work time.
-		sleep := rand.Int63n(50)
-		time.Sleep(time.Duration(sleep) * time.Millisecond)
-		// Display time to wait
-		fmt.Println("\nTime to sleep", sleep, "ms\n")
-
-		// Display project completed by employee.
-		fmt.Printf("Employee : %d : Completed %s\n", employee, project)
+		buffer := make([]byte, 1024)
+		n, _, err := c.ReadFromUDP(buffer)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		fmt.Printf("Reply: %s\n", string(buffer[0:n]))
 	}
+}
 
+func sendMultipleData(c *net.UDPConn, times int) {
+	for i := 0; i < times; i++ {
+		counter++
+		data := &entity.ActivityLog{
+			ElementID:      fmt.Sprintf("123%d", counter),
+			NewData:        fmt.Sprintf(`{"id": %d, "data": "perubahan%d"}`, i, i+1),
+			OldData:        fmt.Sprintf(`{"id": %d, "data": "perubahan%d"}`, i, i),
+			DisplayMessage: `{"action": "merubah data"}`,
+			UriPath:        "/shop/shopcore",
+			ActivityName:   "Perubahan Data",
+			TribeName:      "Enterprise IT",
+			ElementName:    "Shop Core - Update",
+		}
+		dataByte, _ := json.Marshal(data)
+		fmt.Printf("%s", dataByte)
+		fmt.Println()
+		fmt.Println()
+		c.Write(dataByte)
+	}
 }
