@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/kodekoding/go-agent/entity"
+	"github.com/raditya-pratama/go-agent/entity"
 )
 
 var counter = 0

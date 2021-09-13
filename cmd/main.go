@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kodekoding/go-agent/entity"
-	"github.com/kodekoding/go-agent/lib"
+	"github.com/raditya-pratama/go-agent/entity"
+	"github.com/raditya-pratama/go-agent/lib"
 	"github.com/tokopedia/enterpriseapp-audit/lib/client"
 )
 

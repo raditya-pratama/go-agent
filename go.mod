@@ -1,4 +1,4 @@
-module github.com/kodekoding/go-agent
+module github.com/raditya-pratama/go-agent
 
 go 1.16
 

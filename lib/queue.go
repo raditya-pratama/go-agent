@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/kodekoding/go-agent/entity"
+	"github.com/raditya-pratama/go-agent/entity"
 )
 
 type Node struct {
