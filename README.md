@@ -8,5 +8,25 @@ This is a client agent of Enterprise IT Audit Trail Platform
     ```bash
     go build -o audit-agent -race
 
-    ./audit-agent -port=<your-UDP-port|default:8321> -host=<audit-trail-host> -key=<your-audit-trail-key> -secret=<your-audit-trail-secret> -name=<your-service-name> -max_in_flight=<setup_max_in_flight_request> -time_in_flight=<setup_time_limit_in_second> -timeout=<audit-trail-timeout> -client_spawn=<audit-trail_client_spawn>
+    ./audit-agent <options>
+
+    <options>:
+        -client_spawn uint
+            setup audit-trail client spawn (default 100)
+        -host string
+            setup audit-trail server host with port
+        -key string
+            key of audit-trail account
+        -max_in_flight int
+            limit request that should be sent to audit-trail server (default 1000)
+        -name string
+            your app name
+        -port string
+            setup UDP port (default "8321")
+        -secret string
+            secret of audit-trail account
+        -time_in_flight int
+            limit time request that should be sent to server (in second) (default 60)
+        -timeout uint
+            setup audit-trail timeout (default 10)
     ```
