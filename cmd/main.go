@@ -160,44 +160,6 @@ func Dequeue(list *lib.Queue, counter int, mutex *sync.Mutex) {
 	}
 }
 
-func processData(data *lib.List, counter int, mutex *sync.Mutex) {
-	// reset the limit maxInFlight
-	mutex.Lock()
-	counter = 0
-
-	data.Reverse()
-	list := data.GetHead()
-	i := 0
-	for list != nil {
-		value := lib.GetValue(list)
-		valByte, _ := json.Marshal(value)
-		err := json.Unmarshal(valByte, &willBeSent)
-		if err != nil {
-			log.Println("error when unmarshal to struct: " + err.Error())
-		}
-		trx := client.Start(ctx, willBeSent["element_id"])
-		if willBeSent["payload"] == willBeSent["new_data"] {
-			// if payload has exactly_same/equal data with new_data, then empty new_data field
-			willBeSent["new_data"] = ""
-		}
-		if willBeSent["payload"] != "" {
-			trx.RecordPayload(willBeSent["payload"])
-		}
-		delete(willBeSent, "payload")
-
-		trx.RecordEvent("log_data", willBeSent)
-		trx.End()
-		list = lib.GetNext(list)
-		data.SetHead(nil)
-
-		i++
-	}
-	mutex.Unlock()
-	if i > 0 {
-		log.Printf("success sent %d data\n", i)
-	}
-}
-
 func initAuditTrail(cfg *entity.AuditTrailConfig) {
 	if _, err := client.NewClient(
 		client.ConfigAppName(cfg.AppName),
