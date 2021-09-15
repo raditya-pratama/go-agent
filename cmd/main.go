@@ -11,9 +11,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/tokopedia/enterpriseapp-audit/lib/client"
+
 	"github.com/raditya-pratama/go-agent/entity"
 	"github.com/raditya-pratama/go-agent/lib"
-	"github.com/tokopedia/enterpriseapp-audit/lib/client"
 )
 
 var (
@@ -85,44 +86,77 @@ func main() {
 	buffer := make([]byte, maxBuffer)
 	rand.Seed(time.Now().Unix())
 
-	dataList := lib.NewQueue()
+	queue := lib.NewQueue()
+
 	mutex := new(sync.Mutex)
 	limitCounter := 0
-	go watch(dataList, limitCounter, mutex)
+	go watch(queue, limitCounter, mutex)
 	var activityData entity.ActivityLog
 
 	for {
 		if limitCounter == maxInFlight {
-			processData(dataList, limitCounter, mutex)
+			Dequeue(queue, limitCounter, mutex)
 		}
 		limitCounter++
 		n, addr, _ := connection.ReadFromUDP(buffer)
 		receiveData := buffer[0:n]
-		_ = json.Unmarshal(receiveData, &activityData)
-
-		dataList.Insert(activityData)
-
-		if strings.TrimSpace(string(buffer[0:n])) == "STOP" {
+		if strings.TrimSpace(string(receiveData)) == "STOP" {
 			log.Println("Exiting UDP server!")
 			return
 		}
 
-		_, err = connection.WriteToUDP([]byte("success receive data"), addr)
-		if err != nil {
-			log.Println(err)
-			return
-		}
+		_ = json.Unmarshal(receiveData, &activityData)
+		queue.Insert(activityData)
+
+		go func() {
+			connection.WriteToUDP([]byte("success receive data"), addr)
+		}()
 	}
 }
 
-func watch(dataList *lib.List, counter int, mutex *sync.Mutex) {
+func watch(dataList *lib.Queue, counter int, mutex *sync.Mutex) {
 	ticker := time.NewTicker(time.Duration(timeInFlight) * time.Second)
 
 	for {
 		select {
 		case <-ticker.C:
-			processData(dataList, counter, mutex)
+			Dequeue(dataList, counter, mutex)
 		}
+	}
+}
+
+func Dequeue(list *lib.Queue, counter int, mutex *sync.Mutex) {
+	mutex.Lock()
+	defer mutex.Unlock()
+	counter = 0
+	totalData := list.GetTotal()
+	counterTotal := totalData
+	for counterTotal > 0 {
+		value := list.GetFront()
+		valByte, _ := json.Marshal(value)
+		err := json.Unmarshal(valByte, &willBeSent)
+		if err != nil {
+			log.Println("error when unmarshal to struct: " + err.Error())
+		}
+		trx := client.Start(ctx, willBeSent["element_id"])
+		if willBeSent["payload"] == willBeSent["new_data"] {
+			// if payload has exactly_same/equal data with new_data, then empty new_data field
+			willBeSent["new_data"] = ""
+		}
+		if willBeSent["payload"] != "" {
+			trx.RecordPayload(willBeSent["payload"])
+		}
+		delete(willBeSent, "payload")
+
+		trx.RecordEvent("log_data", willBeSent)
+		trx.End()
+
+		list.ReleaseData()
+		counterTotal--
+	}
+
+	if totalData > 0 {
+		log.Printf("success sent %d data\n", totalData)
 	}
 }
 
@@ -142,14 +176,15 @@ func processData(data *lib.List, counter int, mutex *sync.Mutex) {
 			log.Println("error when unmarshal to struct: " + err.Error())
 		}
 		trx := client.Start(ctx, willBeSent["element_id"])
-		if willBeSent["payload"] != "" {
-			trx.RecordPayload(willBeSent["payload"])
-		}
-
 		if willBeSent["payload"] == willBeSent["new_data"] {
 			// if payload has exactly_same/equal data with new_data, then empty new_data field
 			willBeSent["new_data"] = ""
 		}
+		if willBeSent["payload"] != "" {
+			trx.RecordPayload(willBeSent["payload"])
+		}
+		delete(willBeSent, "payload")
+
 		trx.RecordEvent("log_data", willBeSent)
 		trx.End()
 		list = lib.GetNext(list)
@@ -159,7 +194,7 @@ func processData(data *lib.List, counter int, mutex *sync.Mutex) {
 	}
 	mutex.Unlock()
 	if i > 0 {
-		log.Printf("\nsuccess sent %d data\n", i)
+		log.Printf("success sent %d data\n", i)
 	}
 }
 

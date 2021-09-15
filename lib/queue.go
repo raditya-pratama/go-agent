@@ -1,109 +1,52 @@
 package lib
 
 import (
-	"fmt"
+	"container/list"
 	"sync"
 
 	"github.com/raditya-pratama/go-agent/entity"
 )
 
-type Node struct {
-	prev *Node
-	next *Node
-	data entity.ActivityLog
-}
-
-type List struct {
-	head *Node
-	tail *Node
+type Queue struct {
+	list *list.List
 	sync.Mutex
 }
 
-func NewQueue() *List {
-	return &List{}
-}
-
-func (L *List) Insert(key entity.ActivityLog) {
-	L.Lock()
-	defer L.Unlock()
-	list := &Node{
-		next: L.head,
-		data: key,
-	}
-	if L.head != nil {
-		L.head.prev = list
-	}
-	L.head = list
-
-	l := L.head
-	for l.next != nil {
-		l = l.next
-	}
-	L.tail = l
-}
-
-func (l *List) Display() {
-	l.Lock()
-	defer l.Unlock()
-	if l.head == nil {
-		fmt.Println("list is empty")
-		return
-	}
-	list := l.head
-	for list != nil {
-		fmt.Printf("%+v ->", list.data)
-		list = list.next
-		l.head = nil
+func NewQueue() *Queue {
+	return &Queue{
+		list: list.New(),
 	}
 }
 
-func (l *List) GetHead() *Node {
-	l.Lock()
-	defer l.Unlock()
-	return l.head
+func (q *Queue) Insert(data entity.ActivityLog) {
+	q.Lock()
+	defer q.Unlock()
+
+	q.list.PushBack(data)
 }
 
-func (l *List) SetHead(node *Node) {
-	l.Lock()
-	defer l.Unlock()
-	l.head = node
+func (q *Queue) getFront() *list.Element {
+	return q.list.Front()
 }
 
-func GetNext(node *Node) *Node {
+func (q *Queue) GetFront() entity.ActivityLog {
+	q.Lock()
+	defer q.Unlock()
 
-	return node.next
+	data := q.getFront()
+	return data.Value.(entity.ActivityLog)
 }
 
-func GetValue(node *Node) entity.ActivityLog {
-	return node.data
+func (q *Queue) GetTotal() int {
+	q.Lock()
+	defer q.Unlock()
+
+	return q.list.Len()
 }
 
-func Display(list *Node) {
-	for list != nil {
-		fmt.Printf("%v ->", list.data)
-		list = list.next
-	}
-}
+func (q *Queue) ReleaseData() {
+	q.Lock()
+	defer q.Unlock()
 
-func ShowBackwards(list *Node) {
-	for list != nil {
-		fmt.Printf("%v <-", list.data)
-		list = list.prev
-	}
-}
-
-func (l *List) Reverse() {
-	l.Lock()
-	defer l.Unlock()
-	curr := l.head
-	var prev *Node
-	l.tail = l.head
-
-	for curr != nil {
-		next := curr.next
-		curr.next = prev
-		prev = curr
-		curr = next
-	}
-	l.head = prev
+	q.list.Remove(q.getFront())
 }
